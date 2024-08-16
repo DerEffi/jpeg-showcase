@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { FileUpload } from 'primereact/fileupload';
-import JFIF from "./services/jfif";
+import JFIF from "./container/jfif";
 
 export default function App() {
 
