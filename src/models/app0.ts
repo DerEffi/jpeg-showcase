@@ -1,7 +1,7 @@
 export enum DensityUnit {
-    "none" = 0x00,
-    "inch" = 0x01,
-    "cm"   = 0x02
+    "px" = 0x00,
+    "ppi" = 0x01,
+    "ppcm"   = 0x02
 }
 
 export enum ThumbnailFormat {
@@ -24,7 +24,7 @@ export class Thumbnail {
 export class APP0 {
     public identifier: string = ""; // JFIF or JFXX in ASCII (null terminated)
     public version: string = "";
-    public densityUnits: DensityUnit = DensityUnit.none;
+    public densityUnits: DensityUnit = DensityUnit.px;
     public densityX: number = 0;
     public densityY: number = 0;
     public thumbnail: Thumbnail = new Thumbnail();

@@ -1,10 +1,11 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { FileUpload } from 'primereact/fileupload';
-import JFIF from "./container/jfif";
+import { Accordion, AccordionTab } from 'primereact/accordion';
+import JPEG from "./container/jpeg";
 
 export default function App() {
 
-    const [image, setImage] = useState(new JFIF());
+    const [image, setImage] = useState(new JPEG());
 
     const onUpload = async (files: File[]) => {
         
@@ -13,7 +14,7 @@ export default function App() {
             return;
 
         // Update the state to display the new information
-        const jfif = new JFIF(await files[0].arrayBuffer());
+        const jfif = new JPEG(await files[0].arrayBuffer());
         setImage(jfif);
     }
 
@@ -29,25 +30,17 @@ export default function App() {
                 maxFileSize={10000000}
             />
 
-            <table className="marker-table">
-                <thead>
-                    <tr>
-                        <td colSpan={2}>Segment</td>
-                        <td>Position</td>
-                        <td>Size</td>
-                    </tr>
-                </thead>
-                <tbody>
-                    {image.markers.map(marker => 
-                        <tr>
-                            <td>{marker.hexCode}</td>
-                            <td>{marker.segment.shortName}</td>
-                            <td>{marker.start}</td>
-                            <td>{marker.size}</td>
-                        </tr>
-                    )}
-                </tbody>
-            </table>
+            <Accordion
+                activeIndex={-1}
+            >
+                {image.markers.map(marker => 
+                    <AccordionTab header={`${marker.segment.shortName} - (${marker.hexCode})`}>
+                        <h4>{marker.segment.name} ({marker.size} bytes)</h4>
+
+                        {marker.segment.renderer(marker)}
+                    </AccordionTab>
+                )}
+            </Accordion>
         </div>
     );
 }

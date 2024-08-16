@@ -1,7 +1,7 @@
 import Marker from "../models/marker";
-import JFIFParser from "../utils/jfifParser";
+import { generateSegmentTable } from "../utils/parser";
 
-export default class JFIF {
+export default class JPEG {
 
     // raw byte data of the uploaded file
     private _data: Uint8Array = new Uint8Array();
@@ -16,10 +16,13 @@ export default class JFIF {
         this._data = new Uint8Array(buffer);
 
         // read the table of contents of the file
-        this._markers = JFIFParser.generateSegmentTable(this._data);
+        this._markers = generateSegmentTable(this._data);
 
-        // read app0
-        console.dir(JFIFParser.parseAPP0(this._data.subarray(this._markers[1].start, this._markers[1].end)));
+        // parse the different sections
+        for(let i = 0; i < this._markers.length; i++) {
+            let marker = this._markers[i];
+            marker.content = marker.segment.parser(this._data.subarray(marker.start, marker.end));
+        }
     }
 
     /**
