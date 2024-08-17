@@ -17,6 +17,7 @@ export default class JPEG {
 
         // read the table of contents of the file
         this._markers = generateSegmentTable(this._data);
+        console.dir(this._markers);
 
         // parse the different sections
         for(let i = 0; i < this._markers.length; i++) {

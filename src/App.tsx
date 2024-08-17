@@ -34,7 +34,7 @@ export default function App() {
                 activeIndex={-1}
             >
                 {image.markers.map(marker => 
-                    <AccordionTab header={`${marker.segment.shortName} - (${marker.hexCode})`}>
+                    <AccordionTab key={marker.start} header={`${marker.segment.shortName} - (${marker.hexCode})`}>
                         <h4>{marker.segment.name} ({marker.size} bytes)</h4>
 
                         {marker.segment.renderer(marker)}

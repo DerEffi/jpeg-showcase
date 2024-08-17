@@ -21,7 +21,7 @@ export class Thumbnail {
 /**
  *  App marker for JFIF itself
  */ 
-export class APP0 {
+export default class APP0 {
     public identifier: string = ""; // JFIF or JFXX in ASCII (null terminated)
     public version: string = "";
     public densityUnits: DensityUnit = DensityUnit.px;

@@ -1,7 +1,9 @@
-import { APP0, DensityUnit, ThumbnailFormat } from "../models/app0";
-import Marker, { Segment } from "../models/marker";
+import APP0, { DensityUnit, ThumbnailFormat } from "../models/app0";
+import Marker from "../models/marker";
 import { Buffer } from 'buffer';
-import { padLeft } from "./formatter";
+import { padLeft, sanitize } from "./formatter";
+import Segment from "../models/segment";
+import DQT from "../models/dqt";
 
 /**
  * Reads the file contents and creates a table of the different segments of the jpeg
@@ -62,20 +64,21 @@ export function generateSegmentTable(data: Uint8Array) {
  * 
  * @param data content of the segment to analyse including starting marker
  */
-export function parseAPP0(data: Uint8Array) {
-    // validate app0 marker and length
-    if(data.byteLength <= 9)
+export function parseAPP0(data: Uint8Array): APP0 {
+    // validate marker and length
+    if(data.byteLength < 10)
         throw new Error("Given data is too short to be JFIF APP0 header");
     const size = data[2] * 256 + data[3] + 2; // add 2 bytes for the marker itself
     if(data.byteLength !== size)
         throw new Error("Given data doesn't match the defined APP0 header size");
     const marker = data[0] * 256 + data[1];
-    if(marker !== 0xFFE0)
-        throw new Error("Can't analyse '0x" + marker.toString(16).toUpperCase() + "' as APP0 - 0xFFE0 expected");
+    if(marker !== Segment.APP0.code)
+        throw new Error("Can't analyse '0x" + marker.toString(16).toUpperCase() + "' as APP0 - " + Segment.APP0.hexCode + " expected");
 
     // read identifier
     const content: APP0 = new APP0();
-    content.identifier = Buffer.from(data.subarray(4, 8)).toString();
+    const identifier = Buffer.from(data.subarray(4, 8)).toString();
+    content.identifier = sanitize(identifier);
     
     if(content.identifier === "JFIF" || data.byteLength < 18) {
     
@@ -131,6 +134,57 @@ export function parseAPP0(data: Uint8Array) {
     } else {
         throw new Error("Not a valid App0 header identifier for JFIF");
     }
+
+    return content;
+}
+
+/**
+ * Parses the COM segment of the jpeg file
+ * 
+ * @param data content of the segment to analyse including starting marker
+ */
+export function parseCOM(data: Uint8Array): string {
+    // validate marker and length
+    if(data.byteLength < 5)
+        throw new Error("Given data is too short to be COM header");
+    const size = data[2] * 256 + data[3] + 2; // add 2 bytes for the marker itself
+    if(data.byteLength !== size)
+        throw new Error("Given data doesn't match the defined COM header size");
+    const marker = data[0] * 256 + data[1];
+    if(marker !== Segment.COM.code)
+        throw new Error("Can't analyse '0x" + marker.toString(16).toUpperCase() + "' as APP0 - " + Segment.COM.hexCode + " expected");
+
+    const comment = Buffer.from(data.subarray(4)).toString()
+
+    return sanitize(comment);
+}
+
+/**
+ * Parses the DQT segment of the jpeg file
+ * 
+ * @param data content of the segment to analyse including starting marker
+ */
+export function parseDQT(data: Uint8Array): DQT {
+    // validate marker and length
+    if(data.byteLength < 69)
+        throw new Error("Given data is too short to be DQT");
+    const size = data[2] * 256 + data[3] + 2; // add 2 bytes for the marker itself
+    if(data.byteLength !== size)
+        throw new Error("Given data doesn't match the defined DQT size");
+    const marker = data[0] * 256 + data[1];
+    if(marker !== Segment.DQT.code)
+        throw new Error("Can't analyse '0x" + marker.toString(16).toUpperCase() + "' as DQT - " + Segment.DQT.hexCode + " expected");
+
+    const content = new DQT();
+
+    // check the second bit for precision and the last two for destination
+    content.hasWords = ((data[4] >> 2) & 1) === 1;
+    content.destination = data[4] & 3;
+
+    if((content.hasWords && size !== 133) || (!content.hasWords && size !== 69))
+        throw new Error("wrong sized DQT");
+
+    content.values = Array.from(data.subarray(5));
 
     return content;
 }
