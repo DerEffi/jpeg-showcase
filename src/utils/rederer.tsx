@@ -1,7 +1,8 @@
-import APP0, { DensityUnit, ThumbnailFormat } from "../models/app0"
-import DQT from "../models/dqt";
+import APP0, { DensityUnit, ThumbnailFormat } from "../models/segments/app0"
+import DQT from "../models/segments/dqt";
 import Marker from "../models/marker"
 import { sanitize } from "./formatter";
+import SOF0 from "../models/segments/sof0";
 
 export function renderAPP0(marker: Marker<APP0>): JSX.Element {
     if(marker.content === undefined || !(marker.content instanceof APP0))
@@ -54,6 +55,34 @@ export function renderDQT(marker: Marker<DQT>): JSX.Element {
                 <tr><td>{marker.content.values[35]}</td><td>{marker.content.values[36]}</td><td>{marker.content.values[48]}</td><td>{marker.content.values[49]}</td><td>{marker.content.values[57]}</td><td>{marker.content.values[58]}</td><td>{marker.content.values[62]}</td><td>{marker.content.values[63]}</td>
                 </tr>
             </table>
+        </>
+    );
+}
+
+export function renderSOF0(marker: Marker<SOF0>): JSX.Element {
+    if(marker.content === undefined || !(marker.content instanceof SOF0))
+        return <></>
+
+    return(
+        <>
+            Precision: {marker.content.precision}<br/>
+            Size: {marker.content.width} x {marker.content.height} px<br/>
+            Components: {marker.content.componentSize}<br/>
+            <table>
+                <tr>
+                    <td>Id</td>
+                    <td>sampling</td>
+                    <td>DQT</td>
+                </tr>
+                {marker.content.components.map(component => 
+                    <tr>
+                        <td>{component.identifier}</td>
+                        <td>{component.samplingFactors}</td>
+                        <td>{component.dqt}</td>
+                    </tr>
+                )}
+            </table>
+
         </>
     );
 }

@@ -1,5 +1,5 @@
-import { parseAPP0, parseCOM, parseDQT } from "../utils/parser";
-import { renderAPP0, renderCOM, renderDQT } from "../utils/rederer";
+import { parseAPP0, parseCOM, parseDQT, parseSOF0 } from "../utils/parser";
+import { renderAPP0, renderCOM, renderDQT, renderSOF0 } from "../utils/rederer";
 import Marker from "./marker";
 
 /** 
@@ -10,7 +10,7 @@ import Marker from "./marker";
 export default class Segment {
     static readonly NONE = new Segment(0xFFFFFF, "NONE", true, false, 0, "Unknown segment");
     
-    static readonly SOF0 = new Segment(0xFFC0, "SOF0", false, true, 2, "Start Of Frame (baseline DCT)");
+    static readonly SOF0 = new Segment(0xFFC0, "SOF0", false, true, 2, "Start Of Frame (baseline DCT)", parseSOF0, renderSOF0);
     static readonly SOF1 = new Segment(0xFFC1, "SOF1", false, true, 2, "Start Of Frame (extended sequential DCT)");
     static readonly SOF2 = new Segment(0xFFC2, "SOF2", false, true, 2, "Start Of Frame (progressive DCT)");
     static readonly DHT = new Segment(0xFFC4, "DHT", false, true, 2, "Define Huffman Tables");

@@ -1,9 +1,34 @@
-import APP0, { DensityUnit, ThumbnailFormat } from "../models/app0";
+import APP0, { DensityUnit, ThumbnailFormat } from "../models/segments/app0";
 import Marker from "../models/marker";
 import { Buffer } from 'buffer';
 import { padLeft, sanitize } from "./formatter";
 import Segment from "../models/segment";
-import DQT from "../models/dqt";
+import DQT from "../models/segments/dqt";
+import SOF0 from "../models/segments/sof0";
+
+/**
+ * Reads and validates size of the given data to match the table of contents and minimum length for it to contain valid data
+ * @param data bytearray of the segment to analyse
+ * @param segment given definition for the segment the data should represent
+ * @param [minLen=2] additional required length to contain valid data for the specified segment type
+ * @returns true if validation passes (never false, throws instead)
+ * @throws Error if validation fails
+ */
+function validateSegmentSize(data: Uint8Array, segment: Segment, minLen = 2): boolean {
+    if(data.byteLength < minLen)
+        throw new Error(`Given data is too short to be ${segment.shortName} header`);
+    const marker = data[0] * 256 + data[1];
+    if(marker !== segment.code)
+        throw new Error(`Can't analyse '0x${marker.toString(16).toUpperCase()}' as ${segment.shortName} - ${segment.hexCode} expected`);
+    if(segment.hasSizeInfo) {
+        const size = data[2] * 256 + data[3] + 2; // add 2 bytes for the marker itself
+        if(data.byteLength !== size)
+            throw new Error(`Given data doesn't match the defined ${segment.shortName} header size`);
+
+    }
+
+    return true;
+}
 
 /**
  * Reads the file contents and creates a table of the different segments of the jpeg
@@ -65,15 +90,7 @@ export function generateSegmentTable(data: Uint8Array) {
  * @param data content of the segment to analyse including starting marker
  */
 export function parseAPP0(data: Uint8Array): APP0 {
-    // validate marker and length
-    if(data.byteLength < 10)
-        throw new Error("Given data is too short to be JFIF APP0 header");
-    const size = data[2] * 256 + data[3] + 2; // add 2 bytes for the marker itself
-    if(data.byteLength !== size)
-        throw new Error("Given data doesn't match the defined APP0 header size");
-    const marker = data[0] * 256 + data[1];
-    if(marker !== Segment.APP0.code)
-        throw new Error("Can't analyse '0x" + marker.toString(16).toUpperCase() + "' as APP0 - " + Segment.APP0.hexCode + " expected");
+    validateSegmentSize(data, Segment.APP0, 10);
 
     // read identifier
     const content: APP0 = new APP0();
@@ -112,7 +129,7 @@ export function parseAPP0(data: Uint8Array): APP0 {
         } else if(content.thumbnail.format === ThumbnailFormat.Palettized) {
 
             // check if segment is large enough to hold the palette information
-            if(size <= 780)
+            if(data.byteLength <= 780)
                 throw new Error("APP0 segment not large enough to hold thumbnail color palette information");
 
             content.thumbnail.width = data[10];
@@ -144,15 +161,7 @@ export function parseAPP0(data: Uint8Array): APP0 {
  * @param data content of the segment to analyse including starting marker
  */
 export function parseCOM(data: Uint8Array): string {
-    // validate marker and length
-    if(data.byteLength < 5)
-        throw new Error("Given data is too short to be COM header");
-    const size = data[2] * 256 + data[3] + 2; // add 2 bytes for the marker itself
-    if(data.byteLength !== size)
-        throw new Error("Given data doesn't match the defined COM header size");
-    const marker = data[0] * 256 + data[1];
-    if(marker !== Segment.COM.code)
-        throw new Error("Can't analyse '0x" + marker.toString(16).toUpperCase() + "' as APP0 - " + Segment.COM.hexCode + " expected");
+    validateSegmentSize(data, Segment.COM, 5);
 
     const comment = Buffer.from(data.subarray(4)).toString()
 
@@ -165,15 +174,7 @@ export function parseCOM(data: Uint8Array): string {
  * @param data content of the segment to analyse including starting marker
  */
 export function parseDQT(data: Uint8Array): DQT {
-    // validate marker and length
-    if(data.byteLength < 69)
-        throw new Error("Given data is too short to be DQT");
-    const size = data[2] * 256 + data[3] + 2; // add 2 bytes for the marker itself
-    if(data.byteLength !== size)
-        throw new Error("Given data doesn't match the defined DQT size");
-    const marker = data[0] * 256 + data[1];
-    if(marker !== Segment.DQT.code)
-        throw new Error("Can't analyse '0x" + marker.toString(16).toUpperCase() + "' as DQT - " + Segment.DQT.hexCode + " expected");
+    validateSegmentSize(data, Segment.DQT, 69);
 
     const content = new DQT();
 
@@ -181,10 +182,41 @@ export function parseDQT(data: Uint8Array): DQT {
     content.hasWords = ((data[4] >> 2) & 1) === 1;
     content.destination = data[4] & 3;
 
-    if((content.hasWords && size !== 133) || (!content.hasWords && size !== 69))
+    if((content.hasWords && data.byteLength !== 133) || (!content.hasWords && data.byteLength !== 69))
         throw new Error("wrong sized DQT");
 
-    content.values = Array.from(data.subarray(5));
+    // read in values, convert from 8bit to 16bit numbers if necessary
+    if(content.hasWords) {
+        const lastByte = data.byteLength - 1;
+        for(let i = 5; i < lastByte; i += 2)
+            content.values.push(data[i] * 256 + data[i + 1]);
+    } else {
+        content.values = Array.from(data.subarray(5));
+    }
+
+    return content;
+}
+
+export function parseSOF0(data: Uint8Array): SOF0 {
+    validateSegmentSize(data, Segment.SOF0, 13);
+
+    const content = new SOF0();
+
+    // read sof0 data
+    content.precision = data[4];
+    content.height = data[5] * 256 + data[6];
+    content.width = data[7] * 256 + data[8];
+    content.componentSize = data[9];
+
+    // read in sof0 components
+    const lastByte = data.byteLength - 2;
+    for(let i = 10; i < lastByte; i += 3) {
+        content.components.push({
+            identifier: data[i],
+            samplingFactors: data[i + 1],
+            dqt: data[i + 2]
+        });
+    }
 
     return content;
 }
