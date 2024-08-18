@@ -1,5 +1,5 @@
-import { parseAPP0, parseCOM, parseDQT, parseSOF0 } from "../utils/parser";
-import { renderAPP0, renderCOM, renderDQT, renderSOF0 } from "../utils/rederer";
+import { parseAPP0, parseCOM, parseDHT, parseDQT, parseSOF0 } from "../utils/parser";
+import { renderAPP0, renderCOM, renderDHT, renderDQT, renderSOF0 } from "../utils/rederer";
 import Marker from "./marker";
 
 /** 
@@ -13,7 +13,7 @@ export default class Segment {
     static readonly SOF0 = new Segment(0xFFC0, "SOF0", false, true, 2, "Start Of Frame (baseline DCT)", parseSOF0, renderSOF0);
     static readonly SOF1 = new Segment(0xFFC1, "SOF1", false, true, 2, "Start Of Frame (extended sequential DCT)");
     static readonly SOF2 = new Segment(0xFFC2, "SOF2", false, true, 2, "Start Of Frame (progressive DCT)");
-    static readonly DHT = new Segment(0xFFC4, "DHT", false, true, 2, "Define Huffman Tables");
+    static readonly DHT = new Segment(0xFFC4, "DHT", false, true, 2, "Define Huffman Tables", parseDHT, renderDHT);
     static readonly JPG = new Segment(0xFFC8, "JPG", false, true, 2, "JPEG extensions");
     static readonly SOF10 = new Segment(0xFFCA, "SOF10", false, true, 2, "Progressive DCT");
     static readonly DAC = new Segment(0xFFCC, "DAC", false, true, 2, "Define Arithmetic Coding");

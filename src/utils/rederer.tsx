@@ -1,8 +1,11 @@
-import APP0, { DensityUnit, ThumbnailFormat } from "../models/segments/app0"
+import APP0, { DensityUnit, ThumbnailFormat } from "../models/segments/app0";
 import DQT from "../models/segments/dqt";
 import Marker from "../models/marker"
 import { sanitize } from "./formatter";
 import SOF0 from "../models/segments/sof0";
+import DHT from "../models/segments/dht";
+import Tree, { CustomNodeElementProps, RawNodeDatum } from 'react-d3-tree';
+import { BinaryNode } from "../models/tree";
 
 export function renderAPP0(marker: Marker<APP0>): JSX.Element {
     if(marker.content === undefined || !(marker.content instanceof APP0))
@@ -85,4 +88,56 @@ export function renderSOF0(marker: Marker<SOF0>): JSX.Element {
 
         </>
     );
+}
+
+export function renderDHT(marker: Marker<DHT>): JSX.Element {
+    if(marker.content === undefined || !(marker.content instanceof DHT))
+        return <></>
+
+    const tree = renderBinaryNode(marker.content.tree);
+
+    return(
+        <>
+            Id: {marker.content.identifier}<br/>
+            Type: {marker.content.alternating ? "AC" : "DC"}<br/>
+            Sizes: {marker.content.symbolSizes.join(", ")}<br/>
+            Symbols: {marker.content.symbols.join(", ")}<br/>
+            <br/>
+            <div className="dht-tree">
+                <Tree
+                    draggable={true}
+                    collapsible={false}
+                    hasInteractiveNodes={false}
+                    pathFunc={"straight"}
+                    orientation="vertical"
+                    data={[tree]}
+                    nodeSize={{x: 60, y: 60}}
+                    translate={{x: 250, y: 30}}
+                    zoomable={false}
+                    separation={{siblings: 1, nonSiblings: 1}}
+                    renderCustomNodeElement={(props: CustomNodeElementProps) =>
+                        <>
+                            <circle r={15} />
+                            <text className="rd3t-label__title" text-anchor="middle" y="35">{props.nodeDatum.name}</text>
+                        </>
+                    }
+                />
+            </div>
+        </>
+    );
+}
+
+export function renderBinaryNode(node: BinaryNode<any>): RawNodeDatum {
+    const children: RawNodeDatum[] = [];
+    
+    if(node.left !== undefined)
+        children.push(renderBinaryNode(node.left));
+    
+    if(node.right !== undefined)
+        children.push(renderBinaryNode(node.right));
+
+    return {
+        name: node.value === undefined ? "" : node.value,
+        children: node.value === undefined ? children : []
+    };
 }

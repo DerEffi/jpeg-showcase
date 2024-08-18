@@ -5,6 +5,8 @@ import { padLeft, sanitize } from "./formatter";
 import Segment from "../models/segment";
 import DQT from "../models/segments/dqt";
 import SOF0 from "../models/segments/sof0";
+import DHT from "../models/segments/dht";
+import { BinaryNode } from "../models/tree";
 
 /**
  * Reads and validates size of the given data to match the table of contents and minimum length for it to contain valid data
@@ -197,6 +199,11 @@ export function parseDQT(data: Uint8Array): DQT {
     return content;
 }
 
+/**
+ * Parses the SOF0 segment of the jpeg file
+ * 
+ * @param data content of the segment to analyse including starting marker
+ */
 export function parseSOF0(data: Uint8Array): SOF0 {
     validateSegmentSize(data, Segment.SOF0, 13);
 
@@ -216,6 +223,79 @@ export function parseSOF0(data: Uint8Array): SOF0 {
             samplingFactors: data[i + 1],
             dqt: data[i + 2]
         });
+    }
+
+    return content;
+}
+
+/**
+ * Parses the DHT segment of the jpeg file
+ * 
+ * @param data content of the segment to analyse including starting marker
+ */
+export function parseDHT(data: Uint8Array): DHT {
+    validateSegmentSize(data, Segment.DHT, 22);
+
+    const content = new DHT();
+
+    content.identifier = data[4] >> 4; // only firt half of byte
+    content.alternating = (data[4] & 0b00001000) === 0b00001000; // check for bit 4 to be set
+    
+    // read in 16 bytes of symbol size data
+    for(let i = 5; i < 21; i++) {
+        content.symbolSizes.push(data[i]);
+    }
+
+    // read in the symbols with the 16 sizes parsed above
+    let offset = 21;
+    for(let i = 0; i < 16; i++) {
+        const currentSize = content.symbolSizes[i];
+        for(let j = 0; j < currentSize; j++) {
+            content.symbols.push(data[offset + j]);
+        }
+        offset += currentSize;
+    }
+
+    // check for the last non zero symbol length to know when to stop building up a tree
+    let lastLevel = 15;
+    for(let i = 15; i > 0; i--) {
+        lastLevel = i;
+        if(content.symbolSizes[i] > 0)
+            break;
+    }
+
+    // generate tree from parsed symbols by iterating over bitlengths (top-down)
+    let leftMost: BinaryNode<number> | undefined = content.tree;
+    let currentSymbol = 0;
+    for(let i = 0; i <= lastLevel; i++) {
+
+        // no more symbols at current level -> add for all empty left and right nodes
+        let currentNode: BinaryNode<number> | undefined = leftMost;
+        while(currentNode !== undefined) {
+            currentNode.insertLeft();
+            currentNode.insertRight();
+            currentNode = currentNode.getRightLevelNode();
+        }
+
+        // drop down to the next level
+        if(leftMost !== undefined && leftMost.left !== undefined)
+            leftMost = leftMost.left;
+
+        if(content.symbolSizes[i] !== 0) {
+
+            // assign nodes from the leftmost to the right on the current level
+            for(let j = 0; j < content.symbolSizes[i]; j++) {
+                if(currentSymbol >= content.symbols.length)
+                    throw new Error("Missing values in huffman table");
+                if(leftMost === undefined)
+                    throw new Error("Too many values in huffman table");
+                leftMost.value = content.symbols[currentSymbol];
+                leftMost = leftMost.getRightLevelNode();
+                currentSymbol++;
+            }
+
+        }
+    
     }
 
     return content;

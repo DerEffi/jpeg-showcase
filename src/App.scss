@@ -26,3 +26,17 @@ body {
         padding: 2px 15px;
     }
 }
+
+.dht-tree {
+    height: 500px;
+    max-height: 90vh;
+    width: 100%;
+    
+    & text, circle, path {
+        fill: var(--text-color) !important;
+    }
+
+    & circle, path {
+        stroke: var(--text-color) !important;
+    }
+}
