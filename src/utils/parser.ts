@@ -238,8 +238,8 @@ export function parseDHT(data: Uint8Array): DHT {
 
     const content = new DHT();
 
-    content.identifier = data[4] >> 4; // only firt half of byte
-    content.alternating = (data[4] & 0b00001000) === 0b00001000; // check for bit 4 to be set
+    content.alternating = (data[4] >> 4) >= 1; // check for any of the first 4 bits to be set
+    content.identifier = data[4] & 0b1111; // only second half of byte
     
     // read in 16 bytes of symbol size data
     for(let i = 5; i < 21; i++) {
@@ -296,6 +296,25 @@ export function parseDHT(data: Uint8Array): DHT {
 
         }
     
+    }
+
+    return content;
+}
+
+/**
+ * Parses the SOS segment of the jpeg file
+ * 
+ * @param data content of the segment to analyse including starting marker
+ */
+export function parseSOS(data: Uint8Array): number[] {
+    validateSegmentSize(data, Segment.SOS);
+
+    let content: number[] = [];
+
+    // skip byte stuffing for 0x00 following a typical marker indication
+    for(let i = 2; i < data.byteLength; i++) {
+        if(data[i - 1] !== 0xFF)
+            content.push(data[i]);
     }
 
     return content;

@@ -1,4 +1,4 @@
-import { parseAPP0, parseCOM, parseDHT, parseDQT, parseSOF0 } from "../utils/parser";
+import { parseAPP0, parseCOM, parseDHT, parseDQT, parseSOF0, parseSOS } from "../utils/parser";
 import { renderAPP0, renderCOM, renderDHT, renderDQT, renderSOF0 } from "../utils/rederer";
 import Marker from "./marker";
 
@@ -20,7 +20,7 @@ export default class Segment {
 
     static readonly SOI = new Segment(0xFFD8, "SOI", true, false, 2, "Start Of Image");
     static readonly EOI = new Segment(0xFFD9, "EOI", true, false, 2, "End Of Image");
-    static readonly SOS = new Segment(0xFFDA, "SOS", false, false, 2, "Start Of Scan");
+    static readonly SOS = new Segment(0xFFDA, "SOS", false, false, 2, "Start Of Scan", parseSOS);
     static readonly DQT = new Segment(0xFFDB, "DQT", false, true, 2, "Define Quantization Table", parseDQT, renderDQT);
     static readonly COM = new Segment(0xFFFE, "COM", false, true, 2, "Comment", parseCOM, renderCOM);
 
@@ -52,16 +52,19 @@ export default class Segment {
     static readonly APP15 = new Segment(0xFFEF, "APP15", false, true, 2, "App specific");
 
     private constructor(
-        readonly code: number,
+        readonly code: number, // marker code to indicate that segment in the byte array of the jpeg file
         readonly shortName: string,
-        readonly isFixedSize: boolean,
-        readonly hasSizeInfo: boolean,
-        readonly size: number,
+        readonly isFixedSize: boolean, // true if size of that segment is the same for all jpeg files
+        readonly hasSizeInfo: boolean, // true if following the marker is a 2-byte size indicator
+        readonly size: number, // fixed or minimum size of that segment
         readonly name: string,
-        readonly parser: (data: Uint8Array) => any = () => undefined,
-        readonly renderer: (marker: Marker) => JSX.Element = () => <></>
+        readonly parser: (data: Uint8Array) => any = () => undefined, // function run on reading in newly uploaded file for parsing/preparing content 
+        readonly renderer: (marker: Marker) => JSX.Element = () => <></> // function run during display of that selected segment for the user
     ) {}
 
+    /**
+     * @returns hexadecimal string representation of the bytecode in the file starting with '0x'
+     */
     public get hexCode(): string {
         return "0x" + this.code.toString(16).toUpperCase();
     }
