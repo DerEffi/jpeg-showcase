@@ -32,7 +32,7 @@ export class Bitstream {
      * @param n number of bits to receive
      * @returns number representation of the bits received. left padded zeros will be discarded
      */
-    public nextBits(n = 1): number {
+    public nextBits(n: number): number {
         let value = 0;
         
         for(let i = 0; i < n; i++) {

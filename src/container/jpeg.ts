@@ -1,4 +1,8 @@
 import Marker from "../models/marker";
+import Segment from "../models/segment";
+import DHT from "../models/segments/dht";
+import SOF0 from "../models/segments/sof0";
+import { decodeJPEG } from "../utils/decoder";
 import { generateSegmentTable } from "../utils/parser";
 
 export default class JPEG {
@@ -24,6 +28,15 @@ export default class JPEG {
             let marker = this._markers[i];
             marker.content = marker.segment.parser(this._data.subarray(marker.start, marker.end));
         }
+
+        // decode the sof content (jpeg encoded data bitstream)
+        // TODO dynamically find markers and use right decoding method 
+        const dhts: DHT[] = this._markers.filter(marker => marker.code === Segment.DHT.code).map(marker => marker.content) as DHT[];
+        const sofs: SOF0[] = this._markers.filter(marker => marker.code === Segment.SOF0.code).map(marker => marker.content) as SOF0[];
+        const soss: number[][] = this._markers.filter(marker => marker.code === Segment.SOS.code).map(marker => marker.content) as number[][];
+        if(dhts.length !== 4 || sofs.length !== 1 || soss.length !== 1)
+            throw new Error("Not implemented (yet)");
+        //decodeJPEG(soss[0], sofs[0], dhts);
     }
 
     /**
