@@ -6,6 +6,7 @@ import SOF0 from "../models/segments/sof0";
 import DHT from "../models/segments/dht";
 import Tree, { CustomNodeElementProps, RawNodeDatum } from 'react-d3-tree';
 import { BinaryNode } from "../models/tree";
+import RunLengthPair from "../models/runlength";
 
 export function renderAPP0(marker: Marker<APP0>): JSX.Element {
     if(marker.content === undefined || !(marker.content instanceof APP0))
@@ -127,7 +128,7 @@ export function renderDHT(marker: Marker<DHT>): JSX.Element {
     );
 }
 
-export function renderBinaryNode(node: BinaryNode<any>): RawNodeDatum {
+export function renderBinaryNode(node: BinaryNode<number> | BinaryNode<RunLengthPair>): RawNodeDatum {
     const children: RawNodeDatum[] = [];
     
     if(node.left !== undefined)
@@ -137,7 +138,7 @@ export function renderBinaryNode(node: BinaryNode<any>): RawNodeDatum {
         children.push(renderBinaryNode(node.right));
 
     return {
-        name: node.value === undefined ? "" : node.value,
+        name: node.value === undefined ? "" : (node.value instanceof RunLengthPair ? `[${node.value.skips}, ${node.value.size}]` : "" + node.value),
         children: node.value === undefined ? children : []
     };
 }

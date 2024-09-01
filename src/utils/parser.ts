@@ -7,6 +7,7 @@ import DQT from "../models/segments/dqt";
 import SOF0 from "../models/segments/sof0";
 import DHT from "../models/segments/dht";
 import { BinaryNode } from "../models/tree";
+import RunLengthPair from "../models/runlength";
 
 /**
  * Reads and validates size of the given data to match the table of contents and minimum length for it to contain valid data
@@ -240,6 +241,10 @@ export function parseDHT(data: Uint8Array): DHT {
 
     content.alternating = (data[4] >> 4) >= 1; // check for any of the first 4 bits to be set
     content.identifier = data[4] & 0b1111; // only second half of byte
+
+    // change huffman tree to hold runlength pairs instead of just numbers
+    if(content.alternating)
+        content.tree = new BinaryNode<RunLengthPair>();
     
     // read in 16 bytes of symbol size data
     for(let i = 5; i < 21; i++) {
@@ -265,12 +270,12 @@ export function parseDHT(data: Uint8Array): DHT {
     }
 
     // generate tree from parsed symbols by iterating over bitlengths (top-down)
-    let leftMost: BinaryNode<number> | undefined = content.tree;
+    let leftMost: BinaryNode<number> | BinaryNode<RunLengthPair> | undefined = content.tree;
     let currentSymbol = 0;
     for(let i = 0; i <= lastLevel; i++) {
 
         // no more symbols at current level -> add for all empty left and right nodes
-        let currentNode: BinaryNode<number> | undefined = leftMost;
+        let currentNode: BinaryNode<number> | BinaryNode<RunLengthPair> | undefined = leftMost;
         while(currentNode !== undefined) {
             currentNode.insertLeft();
             currentNode.insertRight();
@@ -289,7 +294,7 @@ export function parseDHT(data: Uint8Array): DHT {
                     throw new Error("Missing values in huffman table");
                 if(leftMost === undefined)
                     throw new Error("Too many values in huffman table");
-                leftMost.value = content.symbols[currentSymbol];
+                leftMost.value = content.alternating ? new RunLengthPair(content.symbols[currentSymbol]) : content.symbols[currentSymbol];
                 leftMost = leftMost.getRightLevelNode();
                 currentSymbol++;
             }

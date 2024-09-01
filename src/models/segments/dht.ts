@@ -1,3 +1,4 @@
+import RunLengthPair from "../runlength";
 import { BinaryNode } from "../tree";
 
 export default class DHT {
@@ -5,5 +6,5 @@ export default class DHT {
     alternating: boolean = false; // type of HT, false = DC, true = AC
     symbolSizes: number[] = [];
     symbols: number[] = [];
-    tree: BinaryNode<number> = new BinaryNode<number>();
+    tree: BinaryNode<number> | BinaryNode<RunLengthPair> = new BinaryNode<number>();
 }
