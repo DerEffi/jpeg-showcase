@@ -1,5 +1,5 @@
 import { parseAPP0, parseCOM, parseDHT, parseDQT, parseSOF0, parseSOS } from "../utils/parser";
-import { renderAPP0, renderCOM, renderDHT, renderDQT, renderSOF0 } from "../utils/rederer";
+import { renderAPP0, renderCOM, renderDHT, renderDQT, renderSOF0, renderSOS } from "../utils/rederer";
 import Marker from "./marker";
 
 /** 
@@ -20,7 +20,7 @@ export default class Segment {
 
     static readonly SOI = new Segment(0xFFD8, "SOI", true, false, 2, "Start Of Image");
     static readonly EOI = new Segment(0xFFD9, "EOI", true, false, 2, "End Of Image");
-    static readonly SOS = new Segment(0xFFDA, "SOS", false, false, 2, "Start Of Scan", parseSOS);
+    static readonly SOS = new Segment(0xFFDA, "SOS", false, false, 10, "Start Of Scan", parseSOS, renderSOS);
     static readonly DQT = new Segment(0xFFDB, "DQT", false, true, 2, "Define Quantization Table", parseDQT, renderDQT);
     static readonly COM = new Segment(0xFFFE, "COM", false, true, 2, "Comment", parseCOM, renderCOM);
 

@@ -7,6 +7,7 @@ import DHT from "../models/segments/dht";
 import Tree, { CustomNodeElementProps, RawNodeDatum } from 'react-d3-tree';
 import { BinaryNode } from "../models/tree";
 import RunLengthPair from "../models/runlength";
+import SOS from "../models/segments/sos";
 
 export function renderAPP0(marker: Marker<APP0>): JSX.Element {
     if(marker.content === undefined || !(marker.content instanceof APP0))
@@ -71,7 +72,7 @@ export function renderSOF0(marker: Marker<SOF0>): JSX.Element {
         <>
             Precision: {marker.content.precision}<br/>
             Size: {marker.content.width} x {marker.content.height} px<br/>
-            Components: {marker.content.componentSize}<br/>
+            Components: {marker.content.components.length}<br/>
             <table>
                 <tr>
                     <td>Id</td>
@@ -81,7 +82,7 @@ export function renderSOF0(marker: Marker<SOF0>): JSX.Element {
                 {marker.content.components.map(component => 
                     <tr>
                         <td>{component.identifier}</td>
-                        <td>{component.samplingFactors}</td>
+                        <td>{component.horizontalSampling} x {component.verticalSampling}</td>
                         <td>{component.dqt}</td>
                     </tr>
                 )}
@@ -100,7 +101,7 @@ export function renderDHT(marker: Marker<DHT>): JSX.Element {
     return(
         <>
             Id: {marker.content.identifier}<br/>
-            Type: {marker.content.alternating ? "AC" : "DC"}<br/>
+            Type: {marker.content.identifier >= 16 ? "AC" : "DC"}<br/>
             Sizes: {marker.content.symbolSizes.join(", ")}<br/>
             Symbols: {marker.content.symbols.join(", ")}<br/>
             <br/>
@@ -127,6 +128,32 @@ export function renderDHT(marker: Marker<DHT>): JSX.Element {
         </>
     );
 }
+
+export function renderSOS(marker: Marker<SOS>): JSX.Element {
+    if(marker.content === undefined || !(marker.content instanceof SOS))
+        return <></>
+
+    return(
+        <>
+            Components: {marker.content.components.length}<br/>
+            <table>
+                <tr>
+                    <td>Id</td>
+                    <td>DHT</td>
+                </tr>
+                {marker.content.components.map(component => 
+                    <tr>
+                        <td>{component.identifier}</td>
+                        <td>{component.dht}</td>
+                    </tr>
+                )}
+            </table>
+
+        </>
+    );
+}
+
+
 
 export function renderBinaryNode(node: BinaryNode<number> | BinaryNode<RunLengthPair>): RawNodeDatum {
     const children: RawNodeDatum[] = [];

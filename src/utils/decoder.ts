@@ -2,6 +2,7 @@ import { Bitstream } from "../models/bitstream";
 import RunLengthPair from "../models/runlength";
 import DHT from "../models/segments/dht";
 import SOF0 from "../models/segments/sof0";
+import SOS from "../models/segments/sos";
 import { BinaryNode } from "../models/tree";
 
 const sqrt2 = Math.sqrt(2.0);
@@ -10,34 +11,39 @@ const sqrt2Inverse = 1 / sqrt2;
 /**
  * main decoding function for jpeg compression (baseline)
  */
-export function decodeJPEG(compressedData: Uint8Array | number[], sof: SOF0, huffmanTables: DHT[]) {
+export function decodeBaselineJPEG(compressedData: Uint8Array | number[], sof: SOF0, sos: SOS, dhts: DHT[]) {
     
     // init bitstream for loading single bits that don't line up nicely with whole bytes
     const datastream: Bitstream = new Bitstream(compressedData);
 
     // saving DC coefficients outside the loop, because they are delta encoded (depending on the values of the previous iteration)
-    let coeffCB = 0;
-    let coeffCR = 0;
-    let coeffLUM = 0;
+    const coefficients: number[] = new Array(sos.components.length).fill(0);
 
     // saving different component extracted matrices
-    const rawCB: number[] = [];
-    const rawCR: number[] = [];
-    const rawLUM: number[] = [];
+    const rawMCUData: number[][] = [];
+    for(let i = 0; i < sos.components.length; i++)
+        rawMCUData[i] = [];
 
     // calculating the number of 8x8 segments in the image
-    let segmentHeight = Math.floor(sof.height / 8);
-    let segmentWidth = Math.floor(sof.width / 8);
+    // if not fitting exactly in 8x8 segments, account for padding
+    let segmentHeight = Math.ceil(sof.height / 8);
+    let segmentWidth = Math.ceil(sof.width / 8);
+
+    // convert huffman table array into one index by their respective identifier
+    const huffmanTables: DHT[] = [];
+    dhts.forEach(dht => huffmanTables[dht.identifier] = dht);
 
     // looping over the segments to decode 8x8 squares from the bitstream
     for(let y = 0; y < segmentHeight; y++) {
         for(let x = 0; x < segmentWidth; x++) {
             
-            //TODO dynamically find right huffman table and number of components to cycle through
+            // TODO account for sampling rate
             // decode the different components and store them for next steps
-            rawLUM.push(...decodeJPEGSegment(datastream, huffmanTables[0], huffmanTables[1], {value: coeffLUM}));
-            rawCR.push(...decodeJPEGSegment(datastream, huffmanTables[2], huffmanTables[3], {value: coeffCR}));
-            rawCB.push(...decodeJPEGSegment(datastream, huffmanTables[2], huffmanTables[3], {value: coeffCB}));
+            for(let i = 0; i < sos.components.length; i++) {
+                const componentDC: number = sos.components[i].dht & 0x0F; // 4 LSB for DC table
+                const componentAC: number = 16 + ((sos.components[i].dht >> 4) & 0x0F); // 4 MSB for AC table with identifier 0b0001xxxx indicating an AC table
+                rawMCUData[i].push(...decodeJPEGSegment(datastream, huffmanTables[componentDC], huffmanTables[componentAC], {value: coefficients[i]}));
+            }
 
         }
     }
@@ -53,7 +59,7 @@ export function decodeJPEG(compressedData: Uint8Array | number[], sof: SOF0, huf
  */
 function decodeJPEGSegment(datastream: Bitstream, dcHuffmanTable: DHT, acHuffmanTable: DHT, dcCoefficient: { value: number }): number[] {
 
-    if(dcHuffmanTable.alternating || !acHuffmanTable.alternating)
+    if(dcHuffmanTable.identifier >= 16 || acHuffmanTable.identifier < 16)
         throw new Error("wrong type of DHT passed in decoding");
 
     // init 8x8 matrix with zeroes, since we will skip these
@@ -149,8 +155,6 @@ function getInverseDCT(size: number = 8): number[][] {
  * @param value number representation of the bits found in the bitstream
  * @param length number of bits that were necessary to hold that number in the bitstream
  */
-//TODO not working correctly
-//TODO make sure works for (0,0) as well
 function decodeVariableLengthNumber(value: number, length: number): number {
     // most significaant bit (msb) will be 1 for positive numbers -> value already represented correctly
     if((value >> (length - 1)) === 1)
@@ -158,5 +162,5 @@ function decodeVariableLengthNumber(value: number, length: number): number {
 
     // if msb 0 start at the left boundary: nagative of "(2^bitlength)-1" and add the value
     // mathematically reordered but still the same as described
-    return (value + Math.pow(2, length) + 1);
+    return (value - Math.pow(2, length) + 1);
 }

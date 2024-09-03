@@ -2,8 +2,9 @@ import Marker from "../models/marker";
 import Segment from "../models/segment";
 import DHT from "../models/segments/dht";
 import SOF0 from "../models/segments/sof0";
-import { decodeJPEG } from "../utils/decoder";
-import { generateSegmentTable } from "../utils/parser";
+import SOS from "../models/segments/sos";
+import { decodeBaselineJPEG } from "../utils/decoder";
+import { generateSegmentTable, parseEntropyEncoded } from "../utils/parser";
 
 export default class JPEG {
 
@@ -21,7 +22,7 @@ export default class JPEG {
 
         // read the table of contents of the file
         this._markers = generateSegmentTable(this._data);
-        console.dir(this._markers);
+        console.dir(this._markers); //! DEBUG
 
         // parse the different sections
         for(let i = 0; i < this._markers.length; i++) {
@@ -29,14 +30,19 @@ export default class JPEG {
             marker.content = marker.segment.parser(this._data.subarray(marker.start, marker.end));
         }
 
+        // adjust size of sos marker, since the next marker does not follow directly after
+        const soss: Marker<SOS>[] = this._markers.filter(marker => marker.code === Segment.SOS.code) as Marker<SOS>[];
+        soss.forEach(sos => sos.size = 2 * (sos.content as SOS).components.length + 8) // 8 fixed bytes and 3 bytes per component
+
         // decode the sof content (jpeg encoded data bitstream)
-        // TODO dynamically find markers and use right decoding method 
-        const dhts: DHT[] = this._markers.filter(marker => marker.code === Segment.DHT.code).map(marker => marker.content) as DHT[];
-        const sofs: SOF0[] = this._markers.filter(marker => marker.code === Segment.SOF0.code).map(marker => marker.content) as SOF0[];
-        const soss: number[][] = this._markers.filter(marker => marker.code === Segment.SOS.code).map(marker => marker.content) as number[][];
-        if(dhts.length !== 4 || sofs.length !== 1 || soss.length !== 1)
+        // TODO dynamically find markers and use right decoding method
+        const sofs: Marker<SOF0>[] = this._markers.filter(marker => marker.code === Segment.SOF0.code) as Marker<SOF0>[];
+        const dhts: Marker<DHT>[] = this._markers.filter(marker => marker.code === Segment.DHT.code) as Marker<DHT>[];
+        if(sofs.length !== 1 || soss.length !== 1)
             throw new Error("Not implemented (yet)");
-        //decodeJPEG(soss[0], sofs[0], dhts);
+        
+        const entropyEncodedData = parseEntropyEncoded(this._data.subarray(soss[0].end));
+        decodeBaselineJPEG(entropyEncodedData, sofs[0].content as SOF0, soss[0].content as SOS, dhts.map(marker => marker.content as DHT));
     }
 
     /**

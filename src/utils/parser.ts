@@ -8,6 +8,7 @@ import SOF0 from "../models/segments/sof0";
 import DHT from "../models/segments/dht";
 import { BinaryNode } from "../models/tree";
 import RunLengthPair from "../models/runlength";
+import SOS from "../models/segments/sos";
 
 /**
  * Reads and validates size of the given data to match the table of contents and minimum length for it to contain valid data
@@ -214,15 +215,15 @@ export function parseSOF0(data: Uint8Array): SOF0 {
     content.precision = data[4];
     content.height = data[5] * 256 + data[6];
     content.width = data[7] * 256 + data[8];
-    content.componentSize = data[9];
 
     // read in sof0 components
-    const lastByte = data.byteLength - 2;
-    for(let i = 10; i < lastByte; i += 3) {
+    const componentCount = data[9];
+    for(let i = 0; i < componentCount; i++) {
         content.components.push({
-            identifier: data[i],
-            samplingFactors: data[i + 1],
-            dqt: data[i + 2]
+            identifier: data[10 + (i * 3)],
+            verticalSampling: (data[10 + (i * 3) + 1] >> 4) & 0b1111, // 4 MSB
+            horizontalSampling: data[10 + (i * 3) + 1] & 0b1111, // 4 LSB
+            dqt: data[10 + (i * 3) + 2]
         });
     }
 
@@ -239,11 +240,10 @@ export function parseDHT(data: Uint8Array): DHT {
 
     const content = new DHT();
 
-    content.alternating = (data[4] >> 4) >= 1; // check for any of the first 4 bits to be set
-    content.identifier = data[4] & 0b1111; // only second half of byte
+    content.identifier = data[4]; // >= 16 -> AC Huffman
 
-    // change huffman tree to hold runlength pairs instead of just numbers
-    if(content.alternating)
+    // change huffman tree to hold runlength pairs instead of just numbers if AC
+    if(content.identifier >= 16)
         content.tree = new BinaryNode<RunLengthPair>();
     
     // read in 16 bytes of symbol size data
@@ -294,7 +294,7 @@ export function parseDHT(data: Uint8Array): DHT {
                     throw new Error("Missing values in huffman table");
                 if(leftMost === undefined)
                     throw new Error("Too many values in huffman table");
-                leftMost.value = content.alternating ? new RunLengthPair(content.symbols[currentSymbol]) : content.symbols[currentSymbol];
+                leftMost.value = content.identifier >= 16 ? new RunLengthPair(content.symbols[currentSymbol]) : content.symbols[currentSymbol]; // Save RunLengthPairs for AC Huffman
                 leftMost = leftMost.getRightLevelNode();
                 currentSymbol++;
             }
@@ -311,15 +311,46 @@ export function parseDHT(data: Uint8Array): DHT {
  * 
  * @param data content of the segment to analyse including starting marker
  */
-export function parseSOS(data: Uint8Array): number[] {
+export function parseSOS(data: Uint8Array): SOS {
     validateSegmentSize(data, Segment.SOS);
 
-    let content: number[] = [];
+    const content: SOS = new SOS();
 
-    // skip byte stuffing for 0x00 following a typical marker indication
-    for(let i = 2; i < data.byteLength; i++) {
-        if(data[i - 1] !== 0xFF)
-            content.push(data[i]);
+    // parse components with 2 bytes each
+    const componentCount = data[4];
+    for(let i = 0; i < componentCount; i++) {
+        content.components.push({
+            identifier: data[5 + (2 * i)],
+            dht: data[5 + (2 * i) + 1]
+        });
+    }
+
+    return content;
+}
+
+/**
+ * Parses the actual image data of the jpeg file
+ * 
+ * @param data content starting at the entropy encoded data (end will be determined automatically)
+ */
+export function parseEntropyEncoded(data: Uint8Array): number[] {
+    const content: number[] = [];
+
+    for(let i = 0; i < data.byteLength; i++) {
+        if(data[i] === 0xFF) {
+            // skip byte stuffing 0x00 following a typical marker indication 0xFF
+            if(data[i + 1] === 0x00) {
+                content.push(data[i]);
+                i++;
+                continue;
+            
+            // new marker detected (except restart markers), end this segment
+            } else if(data[i + 1] < 0xD0 || data[i + 1] > 0xD7) {
+                return content;
+            }
+        }
+
+        content.push(data[i]);
     }
 
     return content;
